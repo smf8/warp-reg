@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/curve25519"
+	"io"
+	"os"
 )
 
 type Response struct {
@@ -128,6 +130,79 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	if warpPlusLicenec := os.Getenv("WARP_LICENSE"); warpPlusLicenec != "" {
+		url := fmt.Sprintf("https://api.cloudflareclient.com/v0a2158/reg/%s/account", response.ID)
+		payload := fmt.Sprintf("{\"license\":\"%s\"}", warpPlusLicenec)
+
+		req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(payload))
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		req.Header.Add("CF-Client-Version", "a-6.10-2158")
+		req.Header.Add("User-Agent", "okhttp/3.12.1")
+		req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+		req.Header.Add("Authorization", "Bearer "+response.Token)
+
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer res.Body.Close()
+
+		body, err = io.ReadAll(res.Body)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		if res.StatusCode != 200 {
+			fmt.Printf("failed to update license: %s", string(body))
+		}
+
+		// get the new config
+
+		url = fmt.Sprintf("https://api.cloudflareclient.com/v0a2158/reg/%s", response.ID)
+
+		req, err = http.NewRequest(http.MethodGet, url, nil)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		req.Header.Add("CF-Client-Version", "a-6.10-2158")
+		req.Header.Add("User-Agent", "okhttp/3.12.1")
+		req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+		req.Header.Add("Authorization", "Bearer "+response.Token)
+
+		res, err = client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		defer res.Body.Close()
+
+		body, err = io.ReadAll(res.Body)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		if res.StatusCode != 200 {
+			fmt.Printf("failed to get client info: %s", string(body))
+			return
+		}
+
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
 	// 从JSON响应体中提取"client_id"的值
